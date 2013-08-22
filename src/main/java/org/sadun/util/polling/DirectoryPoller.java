@@ -905,7 +905,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 					}
 				}
 
-				// STUD-419:
+				// STUD-267:
 				//
 				// Deletes AppleDouble files prior to ingestion
 				//
