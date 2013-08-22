@@ -16,6 +16,8 @@ import java.util.Map;
 import org.sadun.util.BidirectionalComparator;
 import org.sadun.util.PathNormalizer;
 import org.sadun.util.Terminable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.deltax.util.listener.BaseSignalSourceThread;
 import com.deltax.util.listener.ExceptionSignal;
@@ -116,6 +118,7 @@ import com.deltax.util.listener.ExceptionSignal;
  */
 public class DirectoryPoller extends BaseSignalSourceThread implements Terminable {
 
+	private final static Logger logger = LoggerFactory.getLogger(DirectoryPoller.class);
 
 	/**
 	 * An exception raised by the poller when auto-move mode is enabled, but the move operation failed.
@@ -901,6 +904,41 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 						visibleFiles.add(f);
 					}
 				}
+
+				// STUD-267:
+				//
+				// Deletes AppleDouble files prior to ingestion
+				//
+				// AppleDouble files are hidden files on OSX that are of the format "._<FILENAME>".
+				// These files get created on by OSX whenever you transfer a file into a networked drive.
+				//
+				// For example:
+				//  - file: foo.mov
+				//  - AppleDouble File: ._foo.xml
+				//
+				// These files are linked to the original and cause issues when moving the original media file from/to
+				// the ingestion workflow directories.
+				//
+				// The assumption is that it's safe to delete any file that has the prefix '._' (you lose some functionality
+				// in apple's finder but we're OK with that
+				File[] appleDoubles = dir.listFiles(new FilenameFilter() {
+					@Override
+					public boolean accept(File dir, String name) {
+						return name.startsWith("._");
+					}
+				});
+				for (File appleDouble : appleDoubles) {
+					boolean deleted = appleDouble.delete();
+					if (!deleted) {
+						logger.warn("Unable to delete AppleDouble file: " + appleDouble.getAbsolutePath());
+					}
+					else {
+						if (logger.isTraceEnabled()) {
+							logger.trace("Deleted AppleDouble file: " + appleDouble.getAbsolutePath());
+						}
+					}
+				}
+
 				fls = visibleFiles.toArray(new File[0]);
 
 				// Sort if required
