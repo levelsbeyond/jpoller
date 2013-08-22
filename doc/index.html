@@ -1,0 +1,376 @@
+<html>
+<head><title>Directory Poller user manual</title></head>
+<body>
+<font face="Helvetica" size=+3 color=navy><b>Directory Poller user manual</b></font>
+<br><font size=-1><i>&copy; Copyright 2001, 2002, 2003, 2004 dr. Cristiano Sadun under <a href="http://www.gnu.org/copyleft/lesser.html#SEC1">LGPL</a></i></font>
+<hr>
+<i><font size=-3>(v1.5.2)</font></i>
+<font face="Helvetica">
+<div align=justify>
+<p>
+<a href="http://www.sourceforge.net/projects/jpoller">Sourceforge summary&amp;download page</a>
+<p>
+<font color="navy"><b>1. Purpose</b></font>
+<p>
+This package realizes a typical behaviour found in many file-based conversations between independent systems: monitoring one or more local directories, observing incoming files and do something when they arrive.
+<p>
+Albeit more advanced techniques exist today to implement such conversations (from queueing systems to RPC in various flavors), file-based implementations are still in wide use since their initial simplicity of setup, monitoring and operations. Everybody has an FTP server, or can find one, or can open a 21 port in their firewall.
+<p>
+This component allows to approach efficiently most of the situations where such a solution needs to be deployed.
+<p>
+Its main service is periodic polling: once started, a <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> object polls one or more directories every <i>x</i> milliseconds, looking for new files (optionally, only files accepted by a given <a href="http://java.sun.com/j2se/1.4/docs/api/java/io/FilenameFilter.html">java.io.FilenameFilter</a>).
+<p>
+If any file are found, proper events are sent to any registered <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a>. The user must provide an implementation of <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a> to plug-in the desired behaviour.
+
+<p>
+<font color="navy"><b>2. Architecture</b></font>
+<p>
+The architecture is quite simple: the <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> class is a Thread class which exposes the main control interface. Poll interval, polling type, verbose level and other properties can be set on its instances.
+<p>
+An <a href="http://space.tin.it/computer/csadun/software/lf">asynchronous event listening framework</a> is used to dispatch signals. The directory poller allows registration of instances of a implementations of the <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a> interface, which will receive the various event objects and process the associated file as they like.
+Here's a class diagram for the main classes.
+<p>
+<table align=center>
+<tr><td align=center><img width="100%" src="images/Architecture.jpg"></td></tr>
+</table>
+<p>
+Client code will provide a <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a> (perhaps extending the <a href="api/org/sadun/util/polling/BasePollManager.html">BasePollManager</a> base implemention), register it within a <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> and invoke its <tt>start()</tt> method.
+The <a href="/doc/api/org/sadun/util/polling/DirectoryPoller.html#shutdown()">shutdown()</a> method is used to stop the poller thread.
+<p>
+<i><b>Time-based polling</b></i>
+<p>
+In general, any file appearing in the controlled directory and accepted by a <tt>FilenameFilter</tt> (provided at construction) will be notified every time the poller looks in the directory.
+However, if time-based polling is enabled, the poller automatically further filters out <i>also</i> files on an "already polled" or "has changed" basis.
+<p>
+Specifically, two time-based polling modes are available:
+<ul>
+<li><b>last-poll-time</b> based: for each controlled directory <b><i>d</i></b>, the poller stores the start time <b><i>t</i></b> of its last polling cycle (or zero on the first cycle); on the succesive polling cycle, only files whose last-modified-time (LMF) is greater than <b><i>t</i></b> are selected. T is called <i>base time</i> (for <b><i>d</i></b>).
+<p>
+<table border><tr><td><font size=-1>
+The net effect is that on every cycle only "new" files will be polled, where "new" is defined as "created/modified at any time after the time of the last polling cycle (or zero on the first cycle)".
+</td></tr></table>
+<p>For example, the file <tt>foo1</tt> whose LMF is <tt>10:00:00</tt> is found in the controlled directory <b><tt>/tosend</tt></b> at startup time 12:00:00. The base time for <b><tt>/tosend</tt></b> becomes 12:00:00, so on the successive polling cycle, at 12:05:00, <tt>foo1</tt> will not be selected again. A file <tt>foo2</tt> appeared in the <b><tt>/tosend</tt></b> with a LMF after 12:00:00, however, will be selected.
+<p>
+<li><b>modification-time</b> based: on every polling cycle, the poller computes the maximum value M of the LMFs of the selected files; on the successive polling cycle, only files modified afterwards (that is, whose LMF is greater than M) are selected, and M is updated accordingly.
+<p>
+<table border><tr><td><font size=-1>
+The net effect is that on every cycle only "new" files will be polled, where "new" is defined as "created/modified at any time after the modification time of any of the files already polled".
+</td></tr></table>
+<p>For example, the file <tt>foo1</tt> whose LMF is <tt>10:00:00</tt> is found in the controlled directory <b><tt>/tosend</tt></b> at startup time 12:00:00. The base time for <b><tt>/tosend</tt></b> becomes 10:00:00, so on the successive polling cycle, at 12:05:00, <tt>foo1</tt> will not be selected again. A file <tt>foo2</tt> appeared in the <b><tt>/tosend</tt></b> with a LMF after 10:00:00, however, will be selected.
+</ul>
+<p>
+<i><b>Automove mode</b></i>
+<p>
+In general, <a href="api/org/sadun/util/polling/PollManager.html">PollManagers</a> receive events <i><b>asynchronously</i></b> with respect to the poller thread. This allows for bad, faulty or defective <a href="api/org/sadun/util/polling/PollManager.html">PollManagers</a> to block or fail without blocking the the poller or interfering with other <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a>s' work, and for <a href="api/org/sadun/util/polling/PollManager.html">PollManagers</a> performing heavy processing to continue to receive events while elaboration is carried on.
+<p>
+However, it also means that, <u>if file processing is performed without moving the file out of the polled directory, the polling interval should be big enough to allow such processing to complete, or the same file may be notified more than once</u>.
+<p>
+Alongside the time-based modes, the <i>automove</i> mode solves the issue by ensuring that the poller itself will move all the files found in a certain controlled directory to an associated directory <i>before</i> notifying the listeners and/or the pollmanager.
+Since the move operation is atomic with respect to the <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a>, processing can take as much as time as wanted, but each file will be notified only once.
+<p>
+In <i>automove</i> mode, the poller associates a directory <b><i>d<sub>1</sub></i></b> (called "automove directory") to each controlled directory <b><i>d</i></b> (by default, a <tt>received</tt> subdirectory of <b><i>d</i></b>); whenever a file is found in <b><i>d</i></b>, it's moved to <b><i>d<sub>1</sub></i></b> and only then the related events generated and notified. <p>
+These events will contain the path of the <i>moved</i> file rather than its original path.
+<p>
+If an exception occurs during moving (for example, the automove directory cannot be created, or a file with the same name exists already exists in the automove directory, etc) an exception event is sent to the <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a> by invoking its <a href="api/org/sadun/util/polling/PollManager.html#exceptionMovingFile(java.io.File, java.io.File)">exceptionMovingFile()</a> method and/or <a href="api/org/sadun/util/polling/PollManager.html#exceptionDeletingTargetFile(java.io.File)">exceptionDeletingTargetFile()</a> method.
+<p>
+For example, if the file <tt>foo1</tt> is found in the controlled directory <b><tt>/tosend</tt></b>, the poller will move it into <b><tt>/tosend/received</tt></b> (or whatever automove directory is associated to <b><tt>/tosend</tt></b>), and the <a href="api/org/sadun/util/polling/FileSetFoundEvent.html">FileSetFoundEvent</a> and/or <a href="api/org/sadun/util/polling/FileFoundEvent.html">FileFoundEvent</a>s will indicate as file path <b><tt>/tosend/received/foo1</tt></b> rather than <b><tt>/tosend/foo1</tt></b>.
+<p>
+<i>Automove mode and locked files</i>
+<p>
+Occasionally, files may take long time to be placed into a controlled directory, and if the poller may attempt to move them when they are not locked. If the <a href="api/org/sadun/util/polling/DirectoryPoller.html#setBypassLockedFiles(boolean)">bypassLockedFile()</a> property is set to <b>true</b> (defaults to <b>false</b>), the poller ignores files that appear to be locked and does not move or notify them (they will be notified in a following polling cycle, as soon as they are not locked anymore).
+<p>If the property is not set, an <a href="api/org/sadun/util/polling/PollManager.html#exceptionMovingFile(java.io.File,%20java.io.File)">exception moving file</a> will be notified as normal, since locked files cannot be moved.
+<p>
+<i><b>Controlling the order of file events</b></i>
+<p>
+By default, no order is imposed on the file events produced by the poller: they will be fired in an arbitrary order, depending on the operating system. However, such order can be controlled by providing a <tt>java.util.Comparator</tt> object which is used to sort the list of  detected files prior to firing events to the PollManagers.
+Any comparator that handles two <tt>java.io.File</tt> objects can be used; two pre-packaged comparators
+ <tt>DirectoryPoller.ModificationTimeComparator</tt> and <tt>DirectoryPoller.FileSizeComparator</tt> are provided as static inner classes of the <tt>DirectoryPoller</tt> class.
+<p>
+If you use the JMX instrumentation, please read also the relative <a href="#comparators">Specifying files sorting comparator via JMX</a> section.
+
+<p>
+<i><b>Stopping and restarting the poller object</b></i>
+<p>
+If you are controlling the poller via JMX, please refer to the next chapter. If you are using the <a href="http://jpoller.sourceforge.net/api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> class programmatically, you may want to stop and restart the polling. <a href="http://jpoller.sourceforge.net/api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> is a Thread object implementing the <a href="http://sadun-util.sourceforge.net/api/org/sadun/util/Terminable.html">Terminable</a> interface (see <a href="http://sadun-util.sourceforge.net/">http://sadun-util.sourceforge.net/</a>) and can be shutdown by using its <a href="http://sadun-util.sourceforge.net/api/org/sadun/util/Terminable.html#shutdown()">shutdown()</a> method.
+<p>
+However, once terminated, the thread will be in Dead state. To restart it, simply create a new Thread using the Poller as a <a href="http://java.sun.com/j2se/1.3/docs/api/java/lang/Runnable.html">Runnable</a> object:
+<pre>
+ DirectoryPoller poller = ...
+ poller.start(); // Start
+ ...
+ poller.shutdown();  // Stop
+ while(poller.isAlive()); // A bit of busy waiting but should be very short - it's here just as an example
+ ...
+ new Thread(poller).start(); // Restart..
+ ..
+ poller.shutdown(); // Stop again
+</pre>
+<p>
+<i><b>Exception notification & debugging</b></i>
+<p>
+In case exceptions are raised when moving or deleting a file by the poller, an <tt>exception...</tt> method in the PollManager is invoked. However, these methods do not provide the root exception object. The <b>debugException</b> property (<tt>false</tt> by default), if turned on, will force the poller to print out on standard output the complete stack trace of the original exception, thus allowing better understanding of the underlying cause.
+<p>
+<font color="navy"><b>3. JMX instrumentation</b></font>
+<p>
+A <a href="http://java.sun.com/products/JavaManagement/">JMX</a> instrumentation of the poller is available, to allow control of its behaviour from a JMX console. This means that a poller object can be created, run and controlled within a JMX agent without writing Java code <a href="#note1">(*)</a>.
+<p>
+Several JMX agents and consoles are already available, from the <a href="http://www.jboss.org">JBoss</a> application server - which is built as a set of managed objects and contains both an agent and a console - to Apache's JMX agent <a href="http://mx4j.sourceforge.net/">MX4J</a> to consoles as <a href="http://mc4j.sourceforge.net/">MC4J</a>.
+<p>
+The instrumented directory poller is a Standard MBean, in the class <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html">ManagedDirectoryPoller</a> (and the associated MBean interface is <a href="api/org/sadun/util/polling/ManagedDirectoryPollerMBean.html">ManagedDirectoryPollerMBean</a>).
+<p>
+It exposes most properties and methods which allow to configure and operate it via a JMX agent. The specific JMX agent prescribes how to physically describe the configuration. Below you'll find <a href="#jboss-jmx-example">an example for JBoss 3.x</a>.
+<p>
+<b><i>Configuring the MBean (overview)</i></b>
+<p>
+Exactly as when operating programmatically, there are two phases in the lifecycle of the MBean: its creation, and its execution.
+<p>
+The creation is generally responsability of the JMX agent, which takes configured properties and creates an MBean instance at startup (or whenever necessary). Most properties need just to be <b><i>declared</i></b>. The verbosity level, for example, or the polling interval have corresponding MBean attributes which can be just declared in whichever way the JMX agent dictates.
+<p>
+However, some of the <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a>'s construction parameters  are Java objects (for example, the array of File objects denoting the controlled directories), and so are some post-construction configuration parameters (for example, the <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a>(s) to use).
+<p>
+While it would be possible to expose them as MBeans as well, that would require additional work on the client side both for configuration or to create PollManager implementations which are failsafe under conditions not necessarily known or understood.
+<p>
+Therefore, the <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html">ManagedDirectoryPoller</a> uses another approach:
+<ul>
+<li> for construction parameters having an immediate denotation as strings, <b>a corresponding initialization property is exposed which takes a <i>comma separated list</i> of strings.</b>
+<p>
+For example, the set of controlled directories (which in <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> is specified as a set of <tt>File</tt> objects) is set as the value of the MBean attribute <b>ControlledDirectories</b>, which contains a comma separated list of the directory names. <u>Note that spaces are not allowed after the commas.</u> For example, <tt><b>/usr/local/incoming,/incoming</b></tt> is a legal value for this property.
+<p>
+Every time this property is set (comprised initialization time), the corresponding <tt>File</tt> objects are created and set.
+<p>
+For example, a configuration like
+<pre>
+<font size=+1><b>&lt;mbean code="org.sadun.util.polling.ManagedDirectoryPoller"&gt;
+  <font color="green">&lt;attribute name="<font color="red">ControlledDirectories</font>"&gt;<font color="red">/usr/local/incoming,/incoming</font>&lt;/attribute&gt;</font>
+&lt;/mbean&gt;
+</b></font></pre>
+will set <tt>/usr/local/incoming</tt> and <tt>/incoming</tt> as controlled directories when the MBean instance is created.
+<p>
+Also, <b>list...()</b> methods are provided as MBeans operations to pretty-print such information when the MBean instance is already created.
+<p>
+<li>For construction parameters requiring more complex object setup and instantiation, <b>the managed poller allows the user to specify the name of a factory class which produces such objects</b>.
+<p>
+For example, <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a>(s) are added to the <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a> invoking specific <a href="api/org/sadun/util/polling/DirectoryPoller.html#addPollManager(org.sadun.util.polling.PollManager)">addPollManager()</a> methods - which, in a managed context, would be infeasible and require the JMX administrator to explicitly invoke the method via the console.
+<p>
+To avoid this problem, the <b>PollManagerFactoryClass</b> property is exposed by the MBean, containing the name of a factory class for an array of <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a>s (or <b>null</b>) which implements the <a href="api/org/sadun/util/polling/PollManagerFactory.html">PollManagerFactory</a> interface.
+<p>
+Every time this property is set (comprised initialization time), an instance of the factory class is created (via its <b>public default constructor</b>), and its <a href="api/org/sadun/util/polling/PollManagerFactory.html#createPollManagers(java.lang.String)">createPollManagers(String canonicalObjectName)</a> method invoked; the resulting <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a> objects are added to the <a href="api/org/sadun/util/polling/DirectoryPoller.html">DirectoryPoller</a>.
+<p>
+The factory receives the canonical MBean name of the poller to which the managers will be added, so that the same factory can be used for multiple pollers and can discriminate among them.
+<p>
+For example, when configured as in
+<pre>
+<font size=+1><b>&lt;mbean code="org.sadun.util.polling.ManagedDirectoryPoller"&gt;
+  <font color="green">&lt;attribute name="<font color="red">PollManagerFactoryClass</font>"&gt;
+   <font color="red">org.sadun.util.polling.test.TestPollManagerFactory</font>
+  &lt;/attribute&gt;</font>
+&lt;/mbean&gt;
+</b></font></pre>
+the MBean will try to instantiate <b><tt>org.sadun.util.polling.test.TestPollManagerFactory</tt></b>, invoke its <a href="api/org/sadun/util/polling/PollManagerFactory.html#createPollManagers()">createPollManagers()</a> and add the resulting objects.
+</ul>
+<p>
+All such properties can be set only when the poller is <b>not running</b>.
+<p>
+<b><i>File name filters</i></b>
+<p>
+A similar mechanism exist for instantiating file name filters. A factory interface <a href="api/org/sadun/util/polling/FilenameFilterFactory.html">FilenameFilterFactory</a> can be implemented by the user to create a specific filename filter (depending on the MBean name), and the name of the implementation class can be specified in the MBean. Doing so (i.e. invoking the <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#setFilenameFilterFactoryClass(java.lang.String)">setFilenameFilterFactoryClass</a> on the MBean will trigger the creation of the FilenameFilter (which overrides any existing filter). If the parameter is an empty string, the filter is reset.
+<a name="comparators">
+<p><b><i>Specifying events ordering and/or files sorting comparator via JMX</i></b>
+<p>
+<i>1. Using sort expressions</i>
+<p>
+The simplest way to impose an ordering to the file events fired by the poller is to set the JMX property <b>EventsOrdering</b> with an expression denoting which file properties to use and which direction (ascending or descending) to order. The expression is a semicolon-separated list of file property names optionally followed by the keywords <b>ascending</b> or <b>descending</b>. For every file, every expression is evaluated. If two files are equal for one expression, the next one will be evaulated, and so on. For example:
+<p>
+<pre>lastModified ascending; length descending</pre>
+<p>
+will order the events using the <i>lastModified</i> property of files and, if the modified property is the same, will use the file's length.
+<p>
+The available properties are as follows:
+<p>
+<table border='1' align='center' width="70%">
+<tr><td><b>Property name</b></td><td><b>Description</b></td></tr>
+<tr><td><tt>lastModified</tt></td><td>Last modified time</td></tr>
+<tr><td><tt>length</tt></td><td>file length</td></tr>
+<tr><td><tt>name</tt></td><td>file name</td></tr>
+<tr><td><tt>canRead</tt></td><td>readability (files that can be read are greater than files that cannot)</td></tr>
+<tr><td><tt>canWrite</tt></td><td>writeability (files that can be written are greater than files that cannot)</td></tr>
+<tr><td><tt>hidden</tt></td><td>visibilty(hidden files are greater than visible files)</td></tr>
+</table>
+<p>
+To indicate no ordering, specify "none".
+<p>
+<table border='1' align='center'>
+<tr><td>
+<font face="Arial" color="red">
+Note that using an ordering expression will actually create an instance of an internal Comparator, so the comparator class, if any, will be overridden automatically; similarly, specifying a different Comparator class will overidde the event ordering.
+</td></tr>
+</table>
+<p>
+<i>2. Using Comparators</i>
+<p>
+Another way to specify the order of FileFound events is - as it is done for the non-JMX DirectoryPoller object - specify a <tt>Comparator</tt> object which is used to sort the files read in a giving controlled directory. Since they are usually relatively simple objects, file sorting comparators (which impose an ordering on the events fired to pollmanagers) can be set by <i>directly specifying  the class of the desired Comparator object as value of the <b>FilesSortComparator</b> MBean property</i> (as opposite to spefcifying a <i>factory</i> class).
+<p>
+<table border='1' align='center'>
+<tr><td>
+<b><font face="Arial" size=+1 color="red">The chosen Comparator class must have a public default constructor.</font> </b>
+</td></tr>
+</table>
+<p>
+For example, the two comparators <a href="api/org/sadun/util/polling/FIFOFileComparator.html">org.sadun.util.polling.FIFOFileComparator</a>
+and <a href="api/org/sadun/util/polling/FIFOFileComparator.html">org.sadun.util.polling.LIFOFileComparator</a> can be used
+directly to specifiy a First-In/First-Out ordering (i.e. the files which have the oldest modification time are notified first to the PollManagers) or Last-In/First-Out ordering (i.e. the newest files are notified first) and are built as simple extensions of the <a href="api/org/sadun/util/polling/DirectoryPoller.ModificationTimeComparator.html">org.sadun.util.polling.DirectoryPoller.ModificationTimeComparator</a> class (which cannot be used directly since requires a <a href="api/org/sadun/util/polling/DirectoryPoller.ModificationTimeComparator.html#DirectoryPoller.ModificationTimeComparator(boolean)">construction parameter</a>).
+<p>
+So, specifying
+<pre>
+<font size=+1><b>&lt;mbean code="org.sadun.util.polling.ManagedDirectoryPoller"&gt;
+  <font color="green">&lt;attribute name="<font color="red">FilesSortComparator</font>"&gt;
+   <font color="red">org.sadun.util.polling.FIFOFileComparator</font>
+  &lt;/attribute&gt;</font>
+&lt;/mbean&gt;
+</b></font></pre>
+has the net effect of ensuring that file events are fired in a FIFO order with respect to their modification times.
+<p>
+If, for example, events must be ordered depending on the file size, the following extension of
+<a href="api/org/sadun/util/polling/DirectoryPoller.ModificationTimeComparator.html">org.sadun.util.polling.DirectoryPoller.FileSizeComparator</a> simply introduces a default constructor and can be therefore used as value for the JMX attribute:
+
+<code><pre>
+public class BiggerInFirstOutComparator extends org.sadun.util.polling.DirectoryPoller.FileSizeComparator {
+
+ public BiggerInFirstOutComparator() {
+ 	 super(false);
+ }
+}</pre></code>
+<p>
+
+</a>
+<p>
+<b>JMX Notifications</b>
+<p>
+From version 1.5, the poller emits also JMX notifications corresponding to the poller events discussed above.
+<p>
+JMX notifications must have a sequence number. The property <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#setJMXSequenceNumberGeneratorClass(java.lang.String)">JMXSequenceNumberGeneratorClass</a> defines the name of a class which implements the <a href="api/org/sadun/util/polling/SequenceNumberGenerator.html">SequenceNumberGenerator</a> interface, and is used to generate such ids. By default, it is set to <a href="api/org/sadun/util/polling/SequenceNumberGenerator.html">org.sadun.util.polling.CoreSequenceNumberGenerator</a>, which simply stores the sequence in memory. If you use a distributed MBeanServer , however, you may need to create your own generator class.
+<p>
+The methods <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#addNotificationListener(java.lang.String, ObjectName)">addNotificationListener(mBeanServer, objectName)</a> and <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#removeNotificationListener(java.lang.String, ObjectName)">removeNotificationListener(mBeanServer, objectName)</a> add and remove notification listeners to/from the poller. The listener is identified by its <a href="http://java.sun.com/j2ee/1.4/docs/api/javax/management/ObjectName.html">ObjectName</a> (for example: <tt>user:service=NotificationMonitor</tt>) and the name of the server it resides on.<
+<p>
+The overloads <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#addNotificationListener(ObjectName)">addNotificationListener(objectName)</a> and <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#removeNotificationListener(ObjectName)">removeNotificationListener(objectName)</a> (which don't require the MBean server name) are shortcuts which default to the current MBeanServer.
+
+<p>
+<b><i>Running the poller from a JMX console</i></b>
+<p>
+Once the poller is created/configured, it's not automatically started by the JMX agent. The JMX administrator must enter the console and explicitly invoked the <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html#startUp()">startUp()</a> operation. The poller thread will start operating - and, if verbose mode is active, its output will show in the hosting JMX agent display.
+<p>
+<a name="JBoss agent"><i>JBoss JMX agent</i>
+<p>
+Certain agents, however, may provide some mechanism for starting automatically an MBean after the agent has initialized. For example, JBoss checks whether an MBean expose the so called "service interface" - two methods called <tt>start()</tt> and <tt>stop()</tt> - and invokes the <tt>start()</tt> method of any MBean that provides them. A specific JBoss subclass of <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html">ManagedDirectoryPoller</a>, <a href="api/org/sadun/util/polling/jboss\ManagedDirectoryPollerService.html">jboss.ManagedDirectoryPollerService</a> (and its accompanying MBean interface, <a href="api/org/sadun/util/polling/jboss\ManagedDirectoryPollerServiceMBean.html">jboss.ManagedDirectoryPollerServiceMBean</a>) are provided for JBoss agent. Using these MBeans instead of the general <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html">ManagedDirectoryPoller</a> will make the directory poller start automatically at JBoss startup, given that enough configuration is provided.
+<p>
+<font size=-1>
+<a name="note1">
+(*) Apart from user-defined functionality, of course: for example, an user-specific <a href="api/org/sadun/util/polling/PollManager.html">PollManager</a> still needs to be written to execute an user-specific action on polling. But <i>instantiation</i>, <i>configuration</i> and <i>running</i> of the poller object do not need coding. This, together with pre-packaged <a href="api/org/sadun/util/polling/PollManager.html">PollManagers</a> like the <a href="api/org/sadun/util/polling/ScriptedPollManager.html">ScriptedPollManager</a> allow complete scriptability, if so desired.
+</a>
+</font>
+<p>
+<font color="navy"><b>4. Examples</b></font>
+<p>
+<b>A programmatic example</b>
+<p>
+The following Java code instatiates a poller on a <tt>/mydir</tt> directory and registers an imaginary <b>MyPollManager</b>, then starts the polling.
+<pre>
+ DirectoryPoller poller = new DirectoryPoller(new File("/mydir"));
+ poller.addPollManager(new MyPollManager());
+ poller.start();
+ ...
+ poller.shutdown();
+</pre>
+<p>
+<b><a name="jboss-jmx-example">Example MBean configuration for JBoss 3.x</a></b>
+<p>
+The following example configures a <a href="api/org/sadun/util/polling/ManagedDirectoryPoller.html">ManagedDirectoryPoller</a> as an MBean whose <tt>ObjectName</tt> is <tt>DirectoryPoller</tt> in the <tt>user</tt> domain (specified in the <tt>user-service.xml</tt> file in the <tt>deploy</tt> directory of a JBoss server). <b>pollmgt.jar</b> must be available in the server's classpath - it's sufficient to put it in the <tt>lib</tt> directory of the JBoss server.
+<p>
+The MBean is set to be verbose, with a polling interval of one second, controlling a <tt>/mydir</tt> directory.
+An user-defined PollManagerFactory (in this case, a <a href="api/org/sadun/util/polling/test/TestPollManagerFactory.html">TestPollManagerFactory</a>, which produces one single instance of <a href="api/org/sadun/util/polling/test/TestPollManager.html">TestPollManager</a>) is setup as a factory for defining which <a href="api/org/sadun/util/polling/PollManager.html">PollManagers</a> to use.
+<pre>
+&lt;mbean
+       code="org.sadun.util.polling.ManagedDirectoryPoller"
+       name="user:service=DirectoryPoller"&gt;
+	&lt;attribute name="Verbose"&gt;true&lt;/attribute&gt;
+	&lt;attribute name="PollInterval"&gt;1000&lt;/attribute&gt;
+	&lt;attribute name="StartBySleeping"&gt;true&lt;/attribute&gt;
+	&lt;attribute name="ControlledDirectories"&lt;/mydir&gt;
+	&lt;attribute name="PollManagerFactoryClass"&gt;org.sadun.util.polling.test.TestPollManagerFactory&lt;/attribute&gt;
+&lt;/mbean&gt;
+</pre>
+<p>
+<b>JBoss 4</b>
+</p>
+To install the MBean under JBoss 4, simply:
+<p>
+<ul>
+<li> create a <b>pollmgt.sar</b> directory under the deploy directory of the server instance of choice (usually <code>/default/deploy</code>)
+<li> copy <code>pollmgt.jar</code> to that directory
+<li> create a subdirectory META-INF
+<li> create the mbean descriptor (remember the enclosing <code>&lt;server&gt;</code> tag) in <code>jboss-service.xml</code>
+</ul>
+<p>
+(of course, you may create the SAR by jarring everything together if you wish).
+<hr>
+<p>
+<i>Changes from version 1.5</i>
+<p>
+<ul>
+<li> Introduced experimental possibility of setting the controlled directories at sleep time rather than only when the poller is inactive
+<li> Introduced exceptions-debugging property
+<li> (Bugfix) Added setTimeBased() method to JMX instance
+<li> (Bugfix) Fixed NullPointerException caused when removing a controlled directory from a running poller
+</ul>
+<p>
+
+<p>
+<i>Changes from version 1.4</i>
+<p>
+<ul>
+<li> Added JMX notifications
+<li> Introduced locked files verification for automove mode
+</ul>
+<p>
+<i>Changes from version 1.3.2</i>
+<p>
+<ul>
+<li> Introduced event sorting
+</ul>
+<p>
+<i>Changes from version 1.3.1</i>
+<p>
+<ul>
+<li> Fixed bug for which in certain cases InterruptedException where raised to the PollManager implementation (interrupted flag was not cleared)
+</ul>
+
+<p>
+<i>Changes from version 1.2.2c</i>
+<p>
+<ul>
+<li> FilenameFilters can be set via JMX by specifiying the name of a factory class
+</ul>
+<p>
+<i>Changes from version 1.2</i>
+<p>
+<ul>
+<li> PollManagerFactory's <tt>createPollManagers()</tt> method now receives the Mbean name of the poller MBean to which the managers will be added
+<li> Fixed bug with initial empty <tt>PollManagerFactoryClass</tt> mbean property
+</ul>
+<p>
+<i>Changes from version 1.1</i>
+<p>
+<ul>
+<li> Added JMX instrumentation.
+<li> Added documentation
+</ul>
+<p>
+<i>Changes from version 1.0</i>
+<p>
+<ul>
+<li> Fixed bug in automove mechanism
+</ul>
+</div>
+</font>
+</body>
+</html>
