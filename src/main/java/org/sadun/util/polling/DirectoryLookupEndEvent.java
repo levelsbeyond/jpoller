@@ -1,0 +1,16 @@
+package org.sadun.util.polling;
+
+import java.io.File;
+
+/**
+ * Indicates that the poller has finished looking for files in a controlled directory.
+ *
+ * @author C. Sadun
+ * @version 1.0
+ */
+public class DirectoryLookupEndEvent extends BaseDirectoryEvent {
+	public DirectoryLookupEndEvent(DirectoryPoller poller, File dir) {
+		super(poller, dir);
+	}
+}
+    
