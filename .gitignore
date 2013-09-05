@@ -1,2 +1,7 @@
 target
 *.iws
+.project
+reach-engine-jpoller.ipr
+.classpath
+.settings
+bin/
