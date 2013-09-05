@@ -568,9 +568,10 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							boolean proceed = true;
 
 							// if hidden, skip
-							if (orig.isHidden()) {
+							if (orig.isHidden() || orig.length() == 0) {
 								failedToMoveCount++;
 								proceed = false;
+								continue;
 							}
 
 							if (logger.isDebugEnabled()) {
@@ -684,6 +685,9 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 						} catch (FileNotFoundException e) {
 							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not verify lock on ").append(orig.getName()).toString()), this));
 							failedToMoveCount++;
+							if (logger.isWarnEnabled()) {
+								logger.warn("Unable to move file", e);
+							}
 							continue;
 						} catch (IOException e) {
 							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Tentative lock attempt failed on ").append(orig.getName()).toString()), this));
