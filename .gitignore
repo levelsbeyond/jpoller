@@ -6,3 +6,4 @@ reach-engine-jpoller.ipr
 .settings
 bin/
 .idea
+*.iml

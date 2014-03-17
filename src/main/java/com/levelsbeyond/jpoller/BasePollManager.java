@@ -7,6 +7,9 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import org.sadun.util.polling.FileFoundEvent;
 import org.sadun.util.polling.FileSetFoundEvent;
@@ -29,6 +32,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BasePollManager extends org.sadun.util.polling.BasePollManager {
 	private static final Logger log = LoggerFactory.getLogger(BasePollManager.class);
 
+	private ThreadPoolExecutor executor;
 	private CompletionService<Result> executorService;
 	Thread resultSnifferThread;
 
@@ -128,11 +132,23 @@ public abstract class BasePollManager extends org.sadun.util.polling.BasePollMan
 		doValidate();
 
 		// configure thread pool
-		executorService = new ExecutorCompletionService<Result>(Executors.newFixedThreadPool(maxConcurrent));
+		executor = new ThreadPoolExecutor(maxConcurrent, maxConcurrent,
+						0L, TimeUnit.MILLISECONDS,
+						new LinkedBlockingQueue<Runnable>());
+
+		executorService = new ExecutorCompletionService<Result>(executor);
 
 		resultSnifferThread = new Thread(new ResultSniffer(), "resultSniffer-" + baseFolder.getAbsolutePath());
 		resultSnifferThread.setDaemon(true);
 		resultSnifferThread.start();
+	}
+
+	public final int getActiveCount() {
+		return (executor != null ? executor.getActiveCount() : 0);
+	}
+
+	public final int getQueuedCount() {
+		return (executor != null ? executor.getQueue().size() : 0);
 	}
 
 	/**
