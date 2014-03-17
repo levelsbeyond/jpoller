@@ -5,3 +5,4 @@ reach-engine-jpoller.ipr
 .classpath
 .settings
 bin/
+.idea
