@@ -19,14 +19,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.deltax.util.listener.BaseSignalSourceThread;
+import com.deltax.util.listener.ExceptionSignal;
+
 import org.sadun.util.BidirectionalComparator;
 import org.sadun.util.PathNormalizer;
 import org.sadun.util.Terminable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.deltax.util.listener.BaseSignalSourceThread;
-import com.deltax.util.listener.ExceptionSignal;
 
 // Referenced classes of package org.sadun.util.polling:
 //            DefaultListener, CycleStartEvent, DirectoryLookupStartEvent, FileMovedEvent,
@@ -81,8 +81,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		}
 	}
 
-	public static final class NullFilenameFilter
-		implements FilenameFilter {
+	public static final class NullFilenameFilter implements FilenameFilter {
 
 		public boolean accept(File dir, String name) {
 			return true;
@@ -96,8 +95,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		}
 	}
 
-	private class TimeFilter
-		implements FilenameFilter {
+	private class TimeFilter implements FilenameFilter {
 
 		public boolean accept(File dir, String name) {
 			File f = new File(dir, name);
@@ -105,11 +103,13 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 				return false;
 			if (f.lastModified() <= baseTime[currentDir]) {
 				if (logger.isDebugEnabled())
-					logger.debug((new StringBuilder()).append(name).append("(").append(f.lastModified()).append("): out of base time (").append(baseTime[currentDir]).append("), ignoring").toString());
+					logger.debug((new StringBuilder()).append(name).append("(").append(f.lastModified()).append("): out of base time (")
+							.append(baseTime[currentDir]).append("), ignoring").toString());
 				return false;
 			}
 			if (logger.isDebugEnabled())
-				logger.debug((new StringBuilder()).append(name).append("(").append(f.lastModified()).append("): older than base time (").append(baseTime[currentDir]).append("), accepted").toString());
+				logger.debug((new StringBuilder()).append(name).append("(").append(f.lastModified()).append("): older than base time (")
+						.append(baseTime[currentDir]).append("), accepted").toString());
 			return additionalFilter.accept(dir, name);
 		}
 
@@ -192,24 +192,23 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		}
 	}
 
-
 	public DirectoryPoller(File dirs[], FilenameFilter filter) {
 		this(dirs, filter, false);
 	}
 
 	public DirectoryPoller(File dirs[]) {
-		this(dirs, ((FilenameFilter) (new NullFilenameFilter())));
+		this(dirs, new NullFilenameFilter());
 	}
 
 	public DirectoryPoller(File directory, FilenameFilter filter) {
-		this(new File[]{
-			directory
+		this(new File[] {
+				directory
 		}, filter);
 	}
 
 	public DirectoryPoller(File directory) {
-		this(new File[]{
-			directory
+		this(new File[] {
+				directory
 		});
 	}
 
@@ -218,7 +217,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	}
 
 	public DirectoryPoller() {
-		this(((FilenameFilter) (new NullFilenameFilter())));
+		this(new NullFilenameFilter());
 	}
 
 	public DirectoryPoller(File dirs[], FilenameFilter filter, boolean timeBased) {
@@ -229,9 +228,9 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		shutdownRequested = false;
 		verbose = System.getProperty("org.sadun.verbose") != null;
 		timeBasedOnLastLookup = true;
-		pollManagersList = new ArrayList<PollManager>();
+		pollManagersList = new ArrayList<>();
 		autoMove = false;
-		autoMoveDirs = new HashMap<File, File>();
+		autoMoveDirs = new HashMap<>();
 		pollInterval = 10000L;
 		startBySleeping = false;
 		sendSingleFileEvent = false;
@@ -239,7 +238,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		filesSortComparator = null;
 		bypassLockedFiles = false;
 		sleeping = false;
-		fileSizeMap = new HashMap<String, Long>();
+		fileSizeMap = new HashMap<>();
 		setName((new StringBuilder()).append("directory-poller-").append(counter++).toString());
 		setDirectories(dirs);
 		originalFilter = new DirectoryFilter(systemSubdirectoryNames, filter);
@@ -248,8 +247,8 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	}
 
 	public DirectoryPoller(File directory, FilenameFilter filter, boolean timeBased) {
-		this(new File[]{
-			directory
+		this(new File[] {
+				directory
 		}, filter, timeBased);
 	}
 
@@ -302,9 +301,10 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 					throw new IllegalArgumentException((new StringBuilder()).append(dir).append(" is not a directory").toString());
 				}
 			}
+
+			this.dirs = dirs;
+			baseTime = new long[dirs.length];
 		}
-		this.dirs = dirs;
-		baseTime = new long[dirs.length];
 	}
 
 	public File[] getDirectories() {
@@ -330,7 +330,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	}
 
 	public void setAutoMoveDirectory(File directory, File autoMoveDirectory)
-		throws IllegalArgumentException, IllegalStateException {
+			throws IllegalArgumentException, IllegalStateException {
 		if (isAlive()) {
 			throw new IllegalStateException("auto-move directories cannot be set once the poller has started");
 		}
@@ -340,10 +340,10 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	}
 
 	private void setAutoMoveDirecetory(File directory, File autoMoveDirectory)
-		throws IllegalArgumentException {
-		directory = PathNormalizer.normalize(directory);
-		checkIfManaged(directory);
-		autoMoveDirs.put(directory, directory = PathNormalizer.normalize(autoMoveDirectory));
+			throws IllegalArgumentException {
+		File normalizedDirectory = PathNormalizer.normalize(directory);
+		checkIfManaged(normalizedDirectory);
+		autoMoveDirs.put(normalizedDirectory, PathNormalizer.normalize(autoMoveDirectory));
 	}
 
 	protected void checkIfManaged(File directory) {
@@ -353,7 +353,8 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 			}
 		}
 
-		throw new IllegalArgumentException((new StringBuilder()).append("The directory ").append(directory).append(" is not under control of the directory poller").toString());
+		throw new IllegalArgumentException((new StringBuilder()).append("The directory ").append(directory)
+				.append(" is not under control of the directory poller").toString());
 	}
 
 	public void setVerbose(boolean v) {
@@ -467,7 +468,8 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 					continue;
 				}
 				if (logger.isDebugEnabled())
-					logger.debug((new StringBuilder()).append("Automove directory ").append(automoveDir).append(" does not exist, attempting to create.").toString());
+					logger.debug((new StringBuilder()).append("Automove directory ").append(automoveDir).append(" does not exist, attempting to create.")
+							.toString());
 				if (!automoveDir.mkdirs())
 					throw new RuntimeException((new StringBuilder()).append("Could not create the directory ").append(automoveDir.getAbsolutePath()).toString());
 				if (logger.isDebugEnabled())
@@ -489,11 +491,13 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 					sleeping = false;
 					if (logger.isDebugEnabled())
 						logger.debug("Poller waking up");
-				} catch (InterruptedException e) {
+				}
+				catch (InterruptedException e) {
 					// no-op
 				}
 			}
-		} while (!shutdownRequested);
+		}
+		while (!shutdownRequested);
 
 		if (logger.isDebugEnabled()) {
 			logger.debug("Poller terminated.");
@@ -508,7 +512,6 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		if (!shutdownRequested) {
 			for (currentDir = 0; currentDir < dirs.length; currentDir++) {
 				File dir = PathNormalizer.normalize(dirs[currentDir]);
-				File originalDir = dir;
 
 				notify(new DirectoryLookupStartEvent(this, dir));
 
@@ -550,10 +553,12 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 						File dest = new File(autoMoveDir, files[j]);
 						if (dest.exists()) {
 							if (logger.isDebugEnabled()) {
-								logger.debug((new StringBuilder()).append("[Automove] Attempting to delete existing ").append(dest.getAbsolutePath()).toString());
+								logger.debug((new StringBuilder()).append("[Automove] Attempting to delete existing ").append(dest.getAbsolutePath())
+										.toString());
 							}
 							if (!dest.delete()) {
-								notify(new ExceptionSignal(new AutomoveDeleteException(orig, dest, (new StringBuilder()).append("Could not delete ").append(dest.getAbsolutePath()).toString()), this));
+								notify(new ExceptionSignal(new AutomoveDeleteException(orig, dest, (new StringBuilder()).append("Could not delete ")
+										.append(dest.getAbsolutePath()).toString()), this));
 								failedToMoveCount++;
 								continue;
 							}
@@ -568,23 +573,24 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							boolean proceed = true;
 
 							// if hidden, skip
-							if (orig.isHidden() || orig.length() == 0) {
+							if (skip(orig)) {
 								failedToMoveCount++;
-								proceed = false;
 								continue;
 							}
 
 							if (logger.isDebugEnabled()) {
-								logger.debug((new StringBuilder()).append("[Automove] Checking to see if ").append(orig.getAbsolutePath()).append(" can be moved to ").append(autoMoveDir.getAbsolutePath()).append(File.separator).toString());
+								logger.debug((new StringBuilder()).append("[Automove] Checking to see if ").append(orig.getAbsolutePath())
+										.append(" can be moved to ").append(autoMoveDir.getAbsolutePath()).append(File.separator).toString());
 							}
 
 							// if not hidden and we're bypass locking
-							if (proceed && bypassLockedFiles) {
+							if (bypassLockedFiles) {
 								RandomAccessFile raf = new RandomAccessFile(orig, "rw");
 								FileChannel channel = raf.getChannel();
 								if (channel.tryLock() == null) {
 									if (logger.isDebugEnabled())
-										logger.debug((new StringBuilder()).append("[Automove] File ").append(orig.getAbsolutePath()).append(" is locked, ignoring").toString());
+										logger.debug((new StringBuilder()).append("[Automove] File ").append(orig.getAbsolutePath())
+												.append(" is locked, ignoring").toString());
 									failedToMoveCount++;
 									proceed = false;
 								}
@@ -601,10 +607,10 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 									filesToCheck.addAll(Arrays.asList(orig.listFiles(new FileFilter() {
 
 										public boolean accept(File file) {
-											return !file.isDirectory();
+											return !file.isDirectory() && !skip(file);
 										}
 									}
-									)));
+											)));
 								}
 								else {
 									filesToCheck.add(orig);
@@ -613,16 +619,20 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 								for (File fileToCheck : filesToCheck) {
 									Long lastFileSize = fileSizeMap.remove(fileToCheck.getAbsolutePath());
 									if (logger.isDebugEnabled()) {
-										logger.debug((new StringBuilder()).append("[Automove] Checking file ").append(orig.getAbsolutePath()).append(" stability, last check = ").append(lastFileSize).append(", current = ").append(fileToCheck.length()).toString());
+										logger.debug((new StringBuilder()).append("[Automove] Checking file ").append(orig.getAbsolutePath())
+												.append(" stability, last check = ").append(lastFileSize).append(", current = ").append(fileToCheck.length())
+												.toString());
 									}
 									if (lastFileSize != null && lastFileSize == fileToCheck.length()) {
 										if (logger.isDebugEnabled()) {
-											logger.debug((new StringBuilder()).append("[Automove] file ").append(orig.getAbsolutePath()).append(" is stable, will move.").toString());
+											logger.debug((new StringBuilder()).append("[Automove] file ").append(orig.getAbsolutePath())
+													.append(" is stable, will move.").toString());
 										}
 									}
 									else {
 										if (logger.isDebugEnabled()) {
-											logger.debug((new StringBuilder()).append("[Automove] file ").append(orig.getAbsolutePath()).append(" is not stable, ignoring.").toString());
+											logger.debug((new StringBuilder()).append("[Automove] file ").append(orig.getAbsolutePath())
+													.append(" is not stable, ignoring.").toString());
 										}
 										fileSizeMap.put(orig.getAbsolutePath(), orig.length());
 										proceed = false;
@@ -635,10 +645,12 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							}
 
 							if (logger.isDebugEnabled()) {
-								logger.debug((new StringBuilder()).append("[Automove] moving file ").append(orig.getAbsolutePath()).append(" to ").append(dest.getAbsolutePath()).toString());
+								logger.debug((new StringBuilder()).append("[Automove] moving file ").append(orig.getAbsolutePath()).append(" to ")
+										.append(dest.getAbsolutePath()).toString());
 							}
 							if (!orig.renameTo(dest)) {
-								notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not move ").append(orig.getName()).append(" to ").append(dest.getAbsolutePath()).toString()), this));
+								notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not move ")
+										.append(orig.getName()).append(" to ").append(dest.getAbsolutePath()).toString()), this));
 								failedToMoveCount++;
 								continue;
 							}
@@ -680,17 +692,22 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							}
 
 							if (logger.isDebugEnabled())
-								logger.debug((new StringBuilder()).append("[Automove] Moved ").append(orig.getAbsolutePath()).append(" to ").append(autoMoveDir.getAbsolutePath()).append(File.separator).toString());
+								logger.debug((new StringBuilder()).append("[Automove] Moved ").append(orig.getAbsolutePath()).append(" to ")
+										.append(autoMoveDir.getAbsolutePath()).append(File.separator).toString());
 							continue;
-						} catch (FileNotFoundException e) {
-							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not verify lock on ").append(orig.getName()).toString()), this));
+						}
+						catch (FileNotFoundException e) {
+							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not verify lock on ")
+									.append(orig.getName()).toString()), this));
 							failedToMoveCount++;
 							if (logger.isWarnEnabled()) {
 								logger.warn("Unable to move file", e);
 							}
 							continue;
-						} catch (IOException e) {
-							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Tentative lock attempt failed on ").append(orig.getName()).toString()), this));
+						}
+						catch (IOException e) {
+							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Tentative lock attempt failed on ")
+									.append(orig.getName()).toString()), this));
 						}
 						failedToMoveCount++;
 					}
@@ -745,16 +762,27 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 						}
 
 						if (logger.isDebugEnabled())
-							logger.debug((new StringBuilder()).append("Basetime for ").append(dirs[currentDir]).append(" is ").append(baseTime[currentDir]).toString());
+							logger.debug((new StringBuilder()).append("Basetime for ").append(dirs[currentDir]).append(" is ").append(baseTime[currentDir])
+									.toString());
 					}
 				}
-				notify(new DirectoryLookupEndEvent(this, originalDir));
+				notify(new DirectoryLookupEndEvent(this, dir));
 			}
 
 			if (!shutdownRequested) {
 				notify(new CycleEndEvent(this, baseTime));
 			}
 		}
+	}
+
+	/**
+	 * True if we should skip the file.. false otherwise
+	 *
+	 * @return true or false
+	 */
+	private boolean skip(File file) {
+		return file.isHidden() || file.length() == 0 || file.getName().startsWith("\\.");
+
 	}
 
 	public FilenameFilter getFilter() {
@@ -767,7 +795,6 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		}
 		else {
 			this.filter = filter;
-			return;
 		}
 	}
 
