@@ -1,0 +1,52 @@
+version: 2
+jobs:
+  build:
+    parallelism: 1
+
+    docker:
+      - image: maven:3-jdk-7
+
+    environment:
+      TZ: America/Denver
+
+    working_directory: ~/jpoller
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - m2-{{ checksum "pom.xml" }}
+            - m2
+
+      - run:
+          name: Execute Tests
+          command: mvn clean install -U -B -s settings.xml -DfailFast 
+
+      - run:
+          name: Push Code Coverage
+          command: bash <(curl -s https://codecov.io/bash) -t "9a4e7e52-ba10-4f02-92cb-a4ede262a0f0"
+
+      - deploy:
+          name: Deploy Artifacts
+          command: |
+            if [ "${CIRCLE_PR_NUMBER}" == "" ]; then
+              mvn deploy -DskipTests -B -s settings.xml
+            fi
+
+      - save_cache:
+          key: m2-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+
+      - save_cache:
+          key: m2
+          paths:
+            - ~/.m2
+
+      # store test reports
+      - store_test_results:
+          path: target/surefire-reports/
+
+      - store_artifacts:
+          path: target/surefire-reports/

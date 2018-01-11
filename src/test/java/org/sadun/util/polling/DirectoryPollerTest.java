@@ -19,7 +19,9 @@
 package org.sadun.util.polling;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static java.nio.file.StandardOpenOption.CREATE;
@@ -35,6 +37,7 @@ import java.io.OutputStreamWriter;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
 import org.sadun.util.PathNormalizer;
@@ -71,7 +74,7 @@ public class DirectoryPollerTest {
 
     void testRunCycleFile_basic(Configuration configuration) throws IOException {
         TestHarness testHarness = configuration == null ? new TestHarness() : new TestHarness(configuration);
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
 
         ArgumentCaptor<CycleStartEvent> startArgument = ArgumentCaptor.forClass(CycleStartEvent.class);
         verify(testHarness.pollManager, times(1)).cycleStarted(startArgument.capture());
@@ -98,7 +101,7 @@ public class DirectoryPollerTest {
         assertThat(endArgument.getValue().getPoller()).isEqualTo(testHarness.poller);
 
         // Call a second time and verify it doesn't pick up any files or directories.
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(2)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(2)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -118,7 +121,7 @@ public class DirectoryPollerTest {
         testStream.write("this is a test\n");
         testStream.flush();
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(1)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(1)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -132,7 +135,7 @@ public class DirectoryPollerTest {
         testStream.write("this is another test\n");
         testStream.close();
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(2)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(2)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -143,7 +146,7 @@ public class DirectoryPollerTest {
         verify(testHarness.pollManager, times(2)).directoryLookupEnded(any(DirectoryLookupEndEvent.class));
         verify(testHarness.pollManager, times(2)).cycleEnded(any(CycleEndEvent.class));
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(3)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(3)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -188,7 +191,8 @@ public class DirectoryPollerTest {
         testStream1.write("this is a test\n");
         testStream1.flush();
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
+
         verify(testHarness.pollManager, times(1)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(1)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -202,7 +206,7 @@ public class DirectoryPollerTest {
         testStream1.write("this is another test\n");
         testStream1.close();
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(2)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(2)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -218,7 +222,7 @@ public class DirectoryPollerTest {
         testStream2.write("this is a test\n");
         testStream2.flush();
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(3)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(3)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -232,7 +236,7 @@ public class DirectoryPollerTest {
         testStream2.write("this is another test\n");
         testStream2.close();
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(4)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(4)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -243,7 +247,7 @@ public class DirectoryPollerTest {
         verify(testHarness.pollManager, times(4)).directoryLookupEnded(any(DirectoryLookupEndEvent.class));
         verify(testHarness.pollManager, times(4)).cycleEnded(any(CycleEndEvent.class));
 
-        testHarness.poller.runCycle();
+        testHarness.runCycle();
         verify(testHarness.pollManager, times(5)).cycleStarted(any(CycleStartEvent.class));
         verify(testHarness.pollManager, times(5)).directoryLookupStarted(any(DirectoryLookupStartEvent.class));
         verify(testHarness.pollManager, times(0)).exceptionDeletingTargetFile(any(File.class));
@@ -265,12 +269,95 @@ public class DirectoryPollerTest {
         verify(testHarness.pollManager, times(5)).cycleEnded(any(CycleEndEvent.class));
     }
 
+
     class TestHarness {
         final TemporaryFolder temporaryFolder;
         final FileSystem fs;
         final Path testdir;
         final DirectoryPoller poller;
-        final PollManager pollManager;
+        final TestPollManager pollManager;
+        final AtomicBoolean locked = new AtomicBoolean(false);
+
+        class TestPollManager implements PollManager {
+
+			@Override
+			public void cycleStarted(CycleStartEvent evt) {
+
+			}
+
+			@Override
+			public void directoryLookupStarted(DirectoryLookupStartEvent evt) {
+
+			}
+
+			@Override
+			public void directoryLookupEnded(DirectoryLookupEndEvent evt) {
+
+			}
+
+			@Override
+			public void fileSetFound(FileSetFoundEvent evt) {
+
+			}
+
+			@Override
+			public void fileMoved(FileMovedEvent evt) {
+
+			}
+
+			@Override
+			public void fileFound(FileFoundEvent evt) {
+
+			}
+
+			@Override
+			public void exceptionDeletingTargetFile(File target) {
+
+			}
+
+			@Override
+			public void exceptionMovingFile(File file, File dest) {
+
+			}
+
+			@Override
+			public void cycleEnded(CycleEndEvent evt)
+			{
+				unlock();
+			}
+		}
+
+		void unlock() {
+			synchronized (locked) {
+				locked.set(false);
+				locked.notifyAll();
+			}
+		}
+
+		void lock() {
+ 	       	synchronized (locked) {
+				locked.set(true);
+			}
+		}
+
+		void waitForLock() {
+        	try {
+				synchronized (locked) {
+					if (locked.get()) {
+						locked.wait(3L);
+					}
+				}
+			}
+			catch (InterruptedException ie) {
+        		// ignore
+			}
+		}
+
+		void runCycle() {
+        	lock();
+        	poller.runCycle();
+        	waitForLock();
+		}
 
         TestHarness() throws IOException {
             // Use temporaryFolder
@@ -278,7 +365,8 @@ public class DirectoryPollerTest {
             temporaryFolder = new TemporaryFolder();
             temporaryFolder.create();
             testdir = temporaryFolder.newFolder("testdir").toPath();
-            pollManager = mock(PollManager.class);
+            pollManager = spy(new TestPollManager());
+            doCallRealMethod().when(pollManager).cycleEnded(any(CycleEndEvent.class));
             if (!testdir.toFile().exists()) {
                 Files.createDirectory(testdir);
             }
@@ -302,7 +390,8 @@ public class DirectoryPollerTest {
             temporaryFolder = null;
             fs = Jimfs.newFileSystem(configuration);
             testdir = fs.getPath("/testdir");
-            pollManager = mock(PollManager.class);
+			pollManager = spy(new TestPollManager());
+			doCallRealMethod().when(pollManager).cycleEnded(any(CycleEndEvent.class));
             Files.createDirectory(testdir);
             poller = new DirectoryPoller();
             poller.addDirectory(testdir.toFile());
