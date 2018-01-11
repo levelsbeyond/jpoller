@@ -1,7 +1,7 @@
 /*
  * Levels Beyond CONFIDENTIAL
  *
- * Copyright 2003 - 2014 Levels Beyond Incorporated
+ * Copyright 2003 - 2018 Levels Beyond Incorporated
  * All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -24,6 +24,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -514,7 +515,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		}
 	}
 
-	private void runCycle() {
+	void runCycle() {
 		if (!shutdownRequested) {
 			notify(new CycleStartEvent(this));
 		}
@@ -533,7 +534,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 
 				File fls[] = dir.listFiles(filter);
 				if (fls == null) {
-					System.err.println((new StringBuilder()).append("Warning: directory ").append(dir).append(" does not exist").toString());
+					logger.warn("Warning: directory {} does not exist", dir.toString());
 					fls = new File[0];
 				}
 
@@ -551,7 +552,6 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 				}
 
 				String movedFiles[] = new String[files.length];
-				int failedToMoveCount = 0;
 				if (autoMove) {
 
 					// the 'received' directory
@@ -559,8 +559,8 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 
 					// iterate through all files to see if they can be moved into the 'received' dir
 					for (int j = 0; j < files.length; j++) {
-						File orig = new File(dir, files[j]);
-						File dest = new File(autoMoveDir, files[j]);
+						final File orig = new File(dir, files[j]);
+						final File dest = new File(autoMoveDir, files[j]);
 						if (dest.exists()) {
 							if (logger.isDebugEnabled()) {
 								logger.debug((new StringBuilder()).append("[Automove] Attempting to delete existing ").append(dest.getAbsolutePath())
@@ -569,7 +569,6 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							if (!dest.delete()) {
 								notify(new ExceptionSignal(new AutomoveDeleteException(orig, dest, (new StringBuilder()).append("Could not delete ")
 										.append(dest.getAbsolutePath()).toString()), this));
-								failedToMoveCount++;
 								continue;
 							}
 							if (logger.isDebugEnabled()) {
@@ -582,9 +581,8 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 						try {
 							boolean proceed = true;
 
-							// if hidden, skip
-							if (skip(orig)) {
-								failedToMoveCount++;
+							// if hidden or it's one of the directories we are scanning later, skip
+							if (skip(orig) || isScanDir(orig)) {
 								continue;
 							}
 
@@ -594,59 +592,67 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							}
 
 							// if not hidden and we're bypass locking
-							if (bypassLockedFiles) {
-								RandomAccessFile raf = new RandomAccessFile(orig, "rw");
-								FileChannel channel = raf.getChannel();
-								if (channel.tryLock() == null) {
-									if (logger.isDebugEnabled())
-										logger.debug((new StringBuilder()).append("[Automove] File ").append(orig.getAbsolutePath())
-												.append(" is locked, ignoring").toString());
-									failedToMoveCount++;
-									proceed = false;
+							if (orig.isFile()) {
+								if (bypassLockedFiles) {
+									RandomAccessFile raf = new RandomAccessFile(orig, "rw");
+									FileChannel channel = raf.getChannel();
+									if (channel.tryLock() == null) {
+										if (logger.isDebugEnabled())
+											logger.debug((new StringBuilder()).append("[Automove] File ").append(orig.getAbsolutePath())
+															 .append(" is locked, ignoring").toString());
+										proceed = false;
+									} else {
+										proceed = true;
+									}
+									channel.close();
 								}
-								else {
-									proceed = true;
-								}
-								channel.close();
 							}
 
 							// if we can still proceed
 							if (proceed) {
-								List<File> filesToCheck = new ArrayList<File>();
+								final List<File> filesToCheck = new ArrayList<File>();
+								// Add all files in child directory tree for testing.
 								if (orig.isDirectory()) {
-									filesToCheck.addAll(Arrays.asList(orig.listFiles(new FileFilter() {
-
-										public boolean accept(File file) {
-											return !file.isDirectory() && !skip(file);
+									new Object() {
+										void addAllFiles(final File scanDir)  {
+											for (final File pFile : scanDir.listFiles(new FileFilter() {
+												public boolean accept(final File file) {
+													return !skip(file) && !isScanDir(file) && (file.isDirectory() || file.isFile());
+												}
+											})) {
+												if (pFile.isFile()) {
+													filesToCheck.add(pFile);
+												}
+												else {
+													addAllFiles(pFile);
+												}
+											}
 										}
-									}
-											)));
+									}.addAllFiles(orig);
 								}
 								else {
 									filesToCheck.add(orig);
 								}
-
-								for (File fileToCheck : filesToCheck) {
+								for (final File fileToCheck : filesToCheck) {
 									Long lastFileSize = fileSizeMap.remove(fileToCheck.getAbsolutePath());
 									if (logger.isDebugEnabled()) {
-										logger.debug((new StringBuilder()).append("[Automove] Checking file ").append(orig.getAbsolutePath())
+										logger.debug((new StringBuilder()).append("[Automove] Checking file ").append(fileToCheck.getAbsolutePath())
 												.append(" stability, last check = ").append(lastFileSize).append(", current = ").append(fileToCheck.length())
 												.toString());
 									}
 									if (lastFileSize != null && lastFileSize == fileToCheck.length()) {
 										if (logger.isDebugEnabled()) {
-											logger.debug((new StringBuilder()).append("[Automove] file ").append(orig.getAbsolutePath())
+											logger.debug((new StringBuilder()).append("[Automove] file ").append(fileToCheck.getAbsolutePath())
 													.append(" is stable, will move.").toString());
 										}
 									}
 									else {
 										if (logger.isDebugEnabled()) {
-											logger.debug((new StringBuilder()).append("[Automove] file ").append(orig.getAbsolutePath())
+											logger.debug((new StringBuilder()).append("[Automove] file ").append(fileToCheck.getAbsolutePath())
 													.append(" is not stable, ignoring.").toString());
 										}
-										fileSizeMap.put(orig.getAbsolutePath(), orig.length());
+										fileSizeMap.put(fileToCheck.getAbsolutePath(), fileToCheck.length());
 										proceed = false;
-										failedToMoveCount++;
 									}
 								}
 							}
@@ -661,7 +667,6 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							if (!orig.renameTo(dest)) {
 								notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not move ")
 										.append(orig.getName()).append(" to ").append(dest.getAbsolutePath()).toString()), this));
-								failedToMoveCount++;
 								continue;
 							}
 							notify(new FileMovedEvent(this, orig, dest));
@@ -704,35 +709,29 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							if (logger.isDebugEnabled())
 								logger.debug((new StringBuilder()).append("[Automove] Moved ").append(orig.getAbsolutePath()).append(" to ")
 										.append(autoMoveDir.getAbsolutePath()).append(File.separator).toString());
-							continue;
 						}
 						catch (FileNotFoundException e) {
 							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not verify lock on ")
 									.append(orig.getName()).toString()), this));
-							failedToMoveCount++;
 							if (logger.isWarnEnabled()) {
 								logger.warn("Unable to move file", e);
 							}
-							continue;
 						}
 						catch (IOException e) {
 							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Tentative lock attempt failed on ")
 									.append(orig.getName()).toString()), this));
 						}
-						failedToMoveCount++;
 					}
 
 				}
 				if (autoMove) {
-					String tmp[] = new String[files.length - failedToMoveCount];
-					int c = 0;
-					for (final String movedFile : movedFiles) {
+					final List<String> movedFileList = new ArrayList<>();
+					for (String movedFile : movedFiles) {
 						if (movedFile != null) {
-							tmp[c++] = movedFile;
+							movedFileList.add(movedFile);
 						}
 					}
-
-					files = tmp;
+					files = movedFileList.toArray(new String[0]);
 				}
 
 				if (files.length > 0) {
@@ -791,8 +790,23 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	 * @return true or false
 	 */
 	private boolean skip(File file) {
-		return file.isHidden() || file.length() == 0 || file.getName().startsWith(".");
+		return !(file.isFile() || file.isDirectory()) || file.isHidden() || file.length() == 0 || file.getName().startsWith(".");
+	}
 
+	private boolean isScanDir(File file) {
+		if (file.isDirectory()) {
+			try {
+				for (File scanDir : dirs) {
+					if (Files.isSameFile(PathNormalizer.normalize(scanDir).toPath(), file.toPath())) {
+						return true;
+					}
+				}
+			}
+			catch (IOException e) {
+				logger.error(String.format("Error while checking %s", file.getAbsolutePath()), e);
+			}
+		}
+		return false;
 	}
 
 	public FilenameFilter getFilter() {

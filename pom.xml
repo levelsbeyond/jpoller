@@ -1,7 +1,7 @@
 <!--
   ~ Levels Beyond CONFIDENTIAL
   ~
-  ~ Copyright 2003 - 2014 Levels Beyond Incorporated
+  ~ Copyright 2003 - 2018 Levels Beyond Incorporated
   ~ All Rights Reserved.
   ~
   ~ NOTICE:  All information contained herein is, and remains
@@ -24,10 +24,12 @@
 	<name>Reach Engine - JPoller</name>
 	<url>http://www.levelsbeyond.com/</url>
 	<properties>
+		<skipTests>false</skipTests>
 		<!-- maven-compiler-plugin -->
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>1.7</maven.compiler.source>
 		<maven.compiler.target>1.7</maven.compiler.target>
+		<maven.jacoco.plugin.version>0.7.5.201505241946</maven.jacoco.plugin.version>
 		<!-- maven-surefire-plugin -->
 		<surefire.args>-Xmx512m -XX:MaxPermSize=256m -Djava.awt.headless=true</surefire.args>
 		<!-- maven-install-plugin -->
@@ -39,6 +41,10 @@
 		<!-- dependency versions -->
 		<slf4j.version>1.7.5</slf4j.version>
 		<spring.version>3.1.1.RELEASE</spring.version>
+		<testng.version>6.12</testng.version>
+		<jimfs.version>1.1</jimfs.version>
+		<mockito.version>1.10.19</mockito.version>
+		<festassert.version>2.0M10</festassert.version>
 	</properties>
 
 	<scm>
@@ -97,7 +103,7 @@
 			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
-				<version>0.7.1.201405082137</version>
+				<version>${maven.jacoco.plugin.version}</version>
 				<executions>
 					<!--
 						Prepares the property pointing to the JaCoCo runtime agent which
@@ -208,8 +214,31 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.5</version>
+			<version>${slf4j.version}</version>
 			<scope>compile</scope>
+		</dependency>
+		<!-- testing -->
+		<dependency>
+			<groupId>org.testng</groupId>
+			<artifactId>testng</artifactId>
+			<version>${testng.version}</version>
+		</dependency>
+		<dependency>
+		  <groupId>com.google.jimfs</groupId>
+		  <artifactId>jimfs</artifactId>
+		  <version>${jimfs.version}</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.mockito/mockito-all -->
+		<dependency>
+		  <groupId>org.mockito</groupId>
+		  <artifactId>mockito-all</artifactId>
+		  <version>${mockito.version}</version>
+		  <scope>test</scope>
+		</dependency>
+		<dependency>
+		  <groupId>org.easytesting</groupId>
+		  <artifactId>fest-assert-core</artifactId>
+		  <version>${festassert.version}</version>
 		</dependency>
 	</dependencies>
 

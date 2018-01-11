@@ -7,3 +7,7 @@ reach-engine-jpoller.ipr
 bin/
 .idea
 *.iml
+# Emacs temporary and backup files
+*~
+.\#*
+\#*\#
