@@ -17,6 +17,7 @@
 
 package org.sadun.util.polling;
 
+import com.deltax.util.listener.Signal;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
@@ -515,16 +516,20 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		}
 	}
 
+	 void notifyEvent(Signal signal) {
+		 notify(signal);
+	 }
+
 	void runCycle() {
 		if (!shutdownRequested) {
-			notify(new CycleStartEvent(this));
+			notifyEvent(new CycleStartEvent(this));
 		}
 
 		if (!shutdownRequested) {
 			for (currentDir = 0; currentDir < dirs.length; currentDir++) {
 				File dir = PathNormalizer.normalize(dirs[currentDir]);
 
-				notify(new DirectoryLookupStartEvent(this, dir));
+				notifyEvent(new DirectoryLookupStartEvent(this, dir));
 
 				if (shutdownRequested) {
 					return;
@@ -567,7 +572,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 										.toString());
 							}
 							if (!dest.delete()) {
-								notify(new ExceptionSignal(new AutomoveDeleteException(orig, dest, (new StringBuilder()).append("Could not delete ")
+								notifyEvent(new ExceptionSignal(new AutomoveDeleteException(orig, dest, (new StringBuilder()).append("Could not delete ")
 										.append(dest.getAbsolutePath()).toString()), this));
 								continue;
 							}
@@ -665,11 +670,11 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 										.append(dest.getAbsolutePath()).toString());
 							}
 							if (!orig.renameTo(dest)) {
-								notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not move ")
+								notifyEvent(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not move ")
 										.append(orig.getName()).append(" to ").append(dest.getAbsolutePath()).toString()), this));
 								continue;
 							}
-							notify(new FileMovedEvent(this, orig, dest));
+							notifyEvent(new FileMovedEvent(this, orig, dest));
 
 							movedFiles[j] = dest.getName();
 
@@ -711,14 +716,14 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 										.append(autoMoveDir.getAbsolutePath()).append(File.separator).toString());
 						}
 						catch (FileNotFoundException e) {
-							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not verify lock on ")
+							notifyEvent(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Could not verify lock on ")
 									.append(orig.getName()).toString()), this));
 							if (logger.isWarnEnabled()) {
 								logger.warn("Unable to move file", e);
 							}
 						}
 						catch (IOException e) {
-							notify(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Tentative lock attempt failed on ")
+							notifyEvent(new ExceptionSignal(new AutomoveException(orig, dest, (new StringBuilder()).append("Tentative lock attempt failed on ")
 									.append(orig.getName()).toString()), this));
 						}
 					}
@@ -737,7 +742,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 				if (files.length > 0) {
 					// STUD:497: DLamy (8/21/13):  Make sure FileSetFoundEvent is pointing at the file in the received folder.
 					File baseDir = (autoMove ? getAutoMoveDirectory(dir) : dir);
-					notify(new FileSetFoundEvent(this, baseDir, files));
+					notifyEvent(new FileSetFoundEvent(this, baseDir, files));
 				}
 
 				if (shutdownRequested) {
@@ -746,7 +751,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 				if (sendSingleFileEvent) {
 					for (final String file1 : files) {
 						File file = new File(dir, file1);
-						notify(new FileFoundEvent(this, file));
+						notifyEvent(new FileFoundEvent(this, file));
 						if (shutdownRequested) {
 							return;
 						}
@@ -775,11 +780,11 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 									.toString());
 					}
 				}
-				notify(new DirectoryLookupEndEvent(this, dir));
+				notifyEvent(new DirectoryLookupEndEvent(this, dir));
 			}
 
 			if (!shutdownRequested) {
-				notify(new CycleEndEvent(this, baseTime));
+				notifyEvent(new CycleEndEvent(this, baseTime));
 			}
 		}
 	}

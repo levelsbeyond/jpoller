@@ -19,7 +19,7 @@
 package org.sadun.util.polling;
 import static org.fest.assertions.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -27,6 +27,8 @@ import static org.mockito.Mockito.verify;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.APPEND;
 
+import com.deltax.util.listener.ExceptionSignal;
+import com.deltax.util.listener.Signal;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import java.io.BufferedOutputStream;
@@ -40,6 +42,8 @@ import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.rules.TemporaryFolder;
 import org.mockito.ArgumentCaptor;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.sadun.util.PathNormalizer;
 import org.testng.annotations.Test;
 
@@ -275,88 +279,11 @@ public class DirectoryPollerTest {
         final FileSystem fs;
         final Path testdir;
         final DirectoryPoller poller;
-        final TestPollManager pollManager;
+        final PollManager pollManager;
         final AtomicBoolean locked = new AtomicBoolean(false);
 
-        class TestPollManager implements PollManager {
-
-			@Override
-			public void cycleStarted(CycleStartEvent evt) {
-
-			}
-
-			@Override
-			public void directoryLookupStarted(DirectoryLookupStartEvent evt) {
-
-			}
-
-			@Override
-			public void directoryLookupEnded(DirectoryLookupEndEvent evt) {
-
-			}
-
-			@Override
-			public void fileSetFound(FileSetFoundEvent evt) {
-
-			}
-
-			@Override
-			public void fileMoved(FileMovedEvent evt) {
-
-			}
-
-			@Override
-			public void fileFound(FileFoundEvent evt) {
-
-			}
-
-			@Override
-			public void exceptionDeletingTargetFile(File target) {
-
-			}
-
-			@Override
-			public void exceptionMovingFile(File file, File dest) {
-
-			}
-
-			@Override
-			public void cycleEnded(CycleEndEvent evt)
-			{
-				unlock();
-			}
-		}
-
-		void unlock() {
-			synchronized (locked) {
-				locked.set(false);
-				locked.notifyAll();
-			}
-		}
-
-		void lock() {
- 	       	synchronized (locked) {
-				locked.set(true);
-			}
-		}
-
-		void waitForLock() {
-        	try {
-				synchronized (locked) {
-					if (locked.get()) {
-						locked.wait(3L);
-					}
-				}
-			}
-			catch (InterruptedException ie) {
-        		// ignore
-			}
-		}
-
 		void runCycle() {
-        	lock();
         	poller.runCycle();
-        	waitForLock();
 		}
 
         TestHarness() throws IOException {
@@ -365,17 +292,12 @@ public class DirectoryPollerTest {
             temporaryFolder = new TemporaryFolder();
             temporaryFolder.create();
             testdir = temporaryFolder.newFolder("testdir").toPath();
-            pollManager = spy(new TestPollManager());
-            doCallRealMethod().when(pollManager).cycleEnded(any(CycleEndEvent.class));
+            pollManager = mock(PollManager.class);
             if (!testdir.toFile().exists()) {
                 Files.createDirectory(testdir);
             }
-            poller = new DirectoryPoller();
-            poller.addDirectory(testdir.toFile());
-            poller.setAutoMove(true);
-            poller.setSendSingleFileEvent(true);
-            poller.setPollInterval(1L);
-            poller.addPollManager(pollManager);
+            poller = spy(new DirectoryPoller());
+            initPoller();
             // Since we're bypassing run, create the automove directory.
             File automoveDir = PathNormalizer.normalize(poller.getAutoMoveDirectory(testdir.toFile()));
             if (!automoveDir.exists()) {
@@ -385,25 +307,47 @@ public class DirectoryPollerTest {
             }
         }
 
-        TestHarness(Configuration configuration) throws IOException {
-            // Use Jimfs virtual filesystem
-            temporaryFolder = null;
-            fs = Jimfs.newFileSystem(configuration);
-            testdir = fs.getPath("/testdir");
-			pollManager = spy(new TestPollManager());
-			doCallRealMethod().when(pollManager).cycleEnded(any(CycleEndEvent.class));
-            Files.createDirectory(testdir);
-            poller = new DirectoryPoller();
-            poller.addDirectory(testdir.toFile());
-            poller.setAutoMove(true);
-            poller.setSendSingleFileEvent(true);
-            poller.setPollInterval(1L);
-            poller.addPollManager(pollManager);
-            // Since we're bypassing run, create the automove directory.
-            Files.createDirectory(
-                fs.getPath(
-                    PathNormalizer.normalize(
-                        poller.getAutoMoveDirectory(testdir.toFile())).getAbsolutePath()));
-        }
+		TestHarness(Configuration configuration) throws IOException {
+			// Use Jimfs virtual filesystem
+			temporaryFolder = null;
+			fs = Jimfs.newFileSystem(configuration);
+			testdir = fs.getPath("/testdir");
+			pollManager = mock(PollManager.class);
+			Files.createDirectory(testdir);
+			poller = spy(new DirectoryPoller());
+			initPoller();
+			// Since we're bypassing run, create the automove directory.
+			Files.createDirectory(
+				fs.getPath(
+					PathNormalizer.normalize(
+						poller.getAutoMoveDirectory(testdir.toFile())).getAbsolutePath()));
+		}
+
+        void initPoller() {
+			poller.addDirectory(testdir.toFile());
+			poller.setAutoMove(true);
+			poller.setSendSingleFileEvent(true);
+			poller.setPollInterval(1L);
+			poller.addPollManager(pollManager);
+			// Bypass calling notify which is asynchronous and instead
+			// call the listener directly synchronously.
+			ArgumentCaptor<DefaultListener> captor = ArgumentCaptor.forClass(DefaultListener.class);
+			verify(poller, times(1)).addListener(captor.capture());
+			final DefaultListener listener = captor.getValue();
+			doAnswer(new Answer() {
+				@Override
+				public Object answer(InvocationOnMock invocation) throws Throwable {
+					Signal signal = (Signal) invocation.getArguments()[0];
+					if (signal instanceof ExceptionSignal) {
+						listener.receiveException((ExceptionSignal) signal);
+					}
+					else {
+						listener.receive(signal);
+					}
+					return null;
+				}
+			}).when(poller).notifyEvent(any(Signal.class));
+		}
+
     }
 }
