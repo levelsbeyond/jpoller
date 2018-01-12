@@ -222,11 +222,13 @@
 			<groupId>org.testng</groupId>
 			<artifactId>testng</artifactId>
 			<version>${testng.version}</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 		  <groupId>com.google.jimfs</groupId>
 		  <artifactId>jimfs</artifactId>
 		  <version>${jimfs.version}</version>
+		  <scope>test</scope>
 		</dependency>
 		<!-- https://mvnrepository.com/artifact/org.mockito/mockito-all -->
 		<dependency>
@@ -239,6 +241,7 @@
 		  <groupId>org.easytesting</groupId>
 		  <artifactId>fest-assert-core</artifactId>
 		  <version>${festassert.version}</version>
+		  <scope>test</scope>
 		</dependency>
 	</dependencies>
 
