@@ -587,6 +587,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 							boolean proceed = true;
 
 							// if hidden or it's one of the directories we are scanning later, skip
+							logger.debug("{} - skip: {}, scandir: {}", orig, skip(orig), isScanDir(orig));
 							if (skip(orig) || isScanDir(orig)) {
 								continue;
 							}
@@ -795,7 +796,10 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	 * @return true or false
 	 */
 	private boolean skip(File file) {
-		return !(file.isFile() || file.isDirectory()) || file.isHidden() || file.length() == 0 || file.getName().startsWith(".");
+		return !(file.isFile() || file.isDirectory())
+			|| file.isHidden()
+			|| (file.isFile() && file.length() == 0)
+			|| file.getName().startsWith(".");
 	}
 
 	private boolean isScanDir(File file) {
