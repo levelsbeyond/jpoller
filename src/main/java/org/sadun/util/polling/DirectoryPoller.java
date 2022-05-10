@@ -614,9 +614,18 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 										}
 										break;
 									case "move":
-										final String destination = post.get("dest");
-										logger.debug("Moving file {} to {} per marker {}: {}", orig.getName(), destination, markerFile.getAbsolutePath(), builder);
-										if (!orig.renameTo(new File(destination))) {
+										final String destinationPath = post.get("dest");
+										final File destination = new File(destinationPath);
+										logger.debug("Moving file {} to {} per marker {}: {}", orig.getName(), destinationPath, markerFile.getAbsolutePath(), builder);
+										if (destination.exists()) {
+											logger.debug("Deleting existing completed folder file " + destination.getAbsolutePath() + " before moving completed file in there.");
+											if (destination.isDirectory()) {
+												deleteDir(destination);
+											} else {
+												destination.delete();
+											}
+										}
+										if (!orig.renameTo(destination)) {
 											logger.warn("Failed to move file {} to {} per post process file {}: {}", orig.getAbsolutePath(), destination, markerFile.getAbsolutePath(), builder);
 										}
 										break;
@@ -968,5 +977,17 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 
 	public void setDebugExceptions(boolean debugExceptions) {
 		this.debugExceptions = debugExceptions;
+	}
+
+	void deleteDir(File file) {
+		File[] contents = file.listFiles();
+		if (contents != null) {
+			for (File f : contents) {
+				if (! Files.isSymbolicLink(f.toPath())) {
+					deleteDir(f);
+				}
+			}
+		}
+		file.delete();
 	}
 }
