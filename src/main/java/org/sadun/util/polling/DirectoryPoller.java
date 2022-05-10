@@ -609,7 +609,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 								switch (post.get("action")) {
 									case "delete":
 										logger.debug("Deleting file {} per marker {}: {}", orig.getName(), markerFile.getAbsolutePath(), builder);
-										if (!orig.delete()) {
+										if (orig.isDirectory() ? !deleteDir(orig) : !orig.delete()) {
 											logger.warn("Failed to delete file {} per post process file {}: {}", orig.getAbsolutePath(), markerFile.getAbsolutePath(), builder);
 										}
 										break;
@@ -619,10 +619,8 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 										logger.debug("Moving file {} to {} per marker {}: {}", orig.getName(), destinationPath, markerFile.getAbsolutePath(), builder);
 										if (destination.exists()) {
 											logger.debug("Deleting existing completed folder file " + destination.getAbsolutePath() + " before moving completed file in there.");
-											if (destination.isDirectory()) {
-												deleteDir(destination);
-											} else {
-												destination.delete();
+											if (destination.isDirectory() ? !deleteDir(destination) : !destination.delete()) {
+												logger.warn("Failed to delete file {} per post process file {}: {}", destination.getAbsolutePath(), markerFile.getAbsolutePath(), builder);
 											}
 										}
 										if (!orig.renameTo(destination)) {
@@ -979,7 +977,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		this.debugExceptions = debugExceptions;
 	}
 
-	void deleteDir(File file) {
+	boolean deleteDir(File file) {
 		File[] contents = file.listFiles();
 		if (contents != null) {
 			for (File f : contents) {
@@ -988,6 +986,6 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 				}
 			}
 		}
-		file.delete();
+		return file.delete();
 	}
 }
