@@ -56,11 +56,11 @@
 	<distributionManagement>
 		<repository>
 			<id>LB-Releases</id>
-			<url>http://levelsbeyond.artifactoryonline.com/levelsbeyond/libs-releases-local</url>
+			<url>https://levelsbeyond.artifactoryonline.com/levelsbeyond/libs-releases-local</url>
 		</repository>
 		<snapshotRepository>
 			<id>LB-Snapshots</id>
-			<url>http://levelsbeyond.artifactoryonline.com/levelsbeyond/libs-snapshots-local</url>
+			<url>https://levelsbeyond.artifactoryonline.com/levelsbeyond/libs-snapshots-local</url>
 		</snapshotRepository>
 	</distributionManagement>
 
