@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import org.sadun.util.BidirectionalComparator;
 import org.sadun.util.PathNormalizer;
+import org.sadun.util.PostProcessMarkerManager;
 import org.sadun.util.Terminable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,7 +65,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	private Map<File, File> autoMoveDirs;
 	private FilenameFilter originalFilter;
 	private long pollInterval;
-	private long postProcessDelayMinutes;
+	private final PostProcessMarkerManager markerManager = new PostProcessMarkerManager();
 	private boolean startBySleeping;
 	private boolean sendSingleFileEvent;
 	private int currentDir;
@@ -450,12 +451,12 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		this.pollInterval = pollInterval;
 	}
 
-	public long getPostProcessDelayMinutes() {
-		return postProcessDelayMinutes;
+	public int getPostProcessDelayMinutes() {
+		return markerManager.getPostProcessDelayMinutes();
 	}
 
-	public void setPostProcessDelayMinutes(long delayMinutes) {
-		postProcessDelayMinutes = delayMinutes;
+	public void setPostProcessDelayMinutes(int delayMinutes) {
+		markerManager.setPostProcessDelayMinutes(delayMinutes);
 	}
 
 	public void setStartBySleeping(boolean v) {
@@ -883,43 +884,23 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 	}
 
 	private File getPostProcessMarkerFile(File file) {
-		return new File(file.getParent(), String.format(".~%s~", file.getName()));
+		return markerManager.getPostProcessMarkerFile(file);
 	}
 
 	private boolean postProcessDelayPending(File file) {
-		// File contains the destination path to move the file to
-		final File processedMarkerFile = getPostProcessMarkerFile(file);
-		return isPostProcessFileExpired(file);
+		return markerManager.postProcessDelayPending(file);
 	}
 
 	private boolean isPostProcessFileExpired(final File processedMarkerFile) {
-		final long delayMillis = getPostProcessDelayMinutes() * 60000;
-		return delayMillis > 0 && processedMarkerFile.exists() && processedMarkerFile.isFile() && processedMarkerFile.canRead() && processedMarkerFile.length() > 0
-			&& System.currentTimeMillis() - processedMarkerFile.lastModified() < delayMillis;
+		return markerManager.isPostProcessFileExpired(processedMarkerFile);
 	}
 
 	Map<String, String> readPostProcessFile(final File processedMarkerFile) {
-		Map<String, String> rval = new HashMap<>();
-
-		try (BufferedReader reader = new BufferedReader(new FileReader(processedMarkerFile))) {
-			for (String line; (line = reader.readLine()) != null; ) {
-				String[] row = line.split("=", 2);
-				if (row.length == 2) {
-					rval.put(row[0], row[1]);
-				}
-			}
-		} catch (IOException e) {
-			logger.error(String.format("Error parsing file %s", processedMarkerFile.getAbsolutePath()), e);
-		}
-		return rval;
+		return markerManager.readPostProcessFile(processedMarkerFile);
 	}
 
 	private boolean removePostProcessMarker(File file) {
-		final File processedMarkerFile = getPostProcessMarkerFile(file);
-		if (!processedMarkerFile.exists()) {
-			return true;
-		}
-		return processedMarkerFile.delete();
+		return markerManager.removePostProcessMarker(file);
 	}
 
 	private boolean isScanDir(File file) {
