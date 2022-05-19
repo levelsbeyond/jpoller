@@ -56,11 +56,11 @@
 	<distributionManagement>
 		<repository>
 			<id>LB-Releases</id>
-			<url>http://levelsbeyond.artifactoryonline.com/levelsbeyond/libs-releases-local</url>
+			<url>https://levelsbeyond.jfrog.io/levelsbeyond/libs-releases-local</url>
 		</repository>
 		<snapshotRepository>
 			<id>LB-Snapshots</id>
-			<url>http://levelsbeyond.artifactoryonline.com/levelsbeyond/libs-snapshots-local</url>
+			<url>https://levelsbeyond.jfrog.io/levelsbeyond/libs-snapshots-local</url>
 		</snapshotRepository>
 	</distributionManagement>
 
@@ -71,7 +71,7 @@
 		</repository>
 		<repository>
 			<id>LB-repository</id>
-			<url>https://levelsbeyond.artifactoryonline.com/levelsbeyond/repo/</url>
+			<url>https://levelsbeyond.jfrog.io/levelsbeyond/repo/</url>
 		</repository>
 	</repositories>
 	<pluginRepositories>
@@ -81,7 +81,7 @@
 		</pluginRepository>
 		<pluginRepository>
 			<id>LB-repository</id>
-			<url>https://levelsbeyond.artifactoryonline.com/levelsbeyond/repo/</url>
+			<url>https://levelsbeyond.jfrog.io/levelsbeyond/repo/</url>
 		</pluginRepository>
 	</pluginRepositories>
 
