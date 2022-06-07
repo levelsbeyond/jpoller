@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -34,19 +35,20 @@ public class PostProcessMarkerManager {
 	}
 
 	public File getPostProcessMarkerFile(File file) {
-		return new File(file.getParent(), String.format(".~%s~", file.getName()));
+		return Paths.get(file.getParent(), String.format(".~%s~", file.getName())).toFile();
 	}
 
 	public boolean postProcessDelayPending(File file) {
 		// File contains the destination path to move the file to
 		final File processedMarkerFile = getPostProcessMarkerFile(file);
-		return !isPostProcessFileExpired(file);
+		return !isPostProcessFileExpired(processedMarkerFile);
 	}
 
 	public boolean isPostProcessFileExpired(final File processedMarkerFile) {
 		final long delayMillis = postProcessDelayMinutes * 60000L;
-		return delayMillis < 1 || (processedMarkerFile.exists() && processedMarkerFile.isFile() && processedMarkerFile.canRead() && processedMarkerFile.length() > 0
-			&& System.currentTimeMillis() - processedMarkerFile.lastModified() < delayMillis);
+		return delayMillis < 1 ||
+			(processedMarkerFile.exists() && processedMarkerFile.isFile() && processedMarkerFile.canRead() && processedMarkerFile.length() > 0
+			&& System.currentTimeMillis() - processedMarkerFile.lastModified() > delayMillis);
 	}
 
 	public Map<String, String> readPostProcessFile(final File processedMarkerFile) {

@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -958,7 +959,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		this.debugExceptions = debugExceptions;
 	}
 
-	boolean deleteDir(File file) {
+	static public boolean deleteDir(File file) {
 		File[] contents = file.listFiles();
 		if (contents != null) {
 			for (File f : contents) {
