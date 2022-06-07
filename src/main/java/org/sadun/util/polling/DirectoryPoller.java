@@ -20,17 +20,14 @@ package org.sadun.util.polling;
 import com.deltax.util.listener.BaseSignalSourceThread;
 import com.deltax.util.listener.ExceptionSignal;
 import com.deltax.util.listener.Signal;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -963,7 +960,7 @@ public class DirectoryPoller extends BaseSignalSourceThread implements Terminabl
 		File[] contents = file.listFiles();
 		if (contents != null) {
 			for (File f : contents) {
-				if (! Files.isSymbolicLink(f.toPath())) {
+				if (!Files.isSymbolicLink(f.toPath())) {
 					deleteDir(f);
 				}
 			}

@@ -1,32 +1,20 @@
 package org.sadun.util;
 
 import static org.fest.assertions.api.Assertions.assertThat;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.spy;
 import static org.mockito.MockitoAnnotations.initMocks;
-import static org.testng.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
 import org.mockito.InjectMocks;
-import org.mockito.Mock;
 import org.mockito.Spy;
 import org.sadun.util.polling.DirectoryPoller;
 import org.testng.annotations.Test;
@@ -98,7 +86,7 @@ public class PostProcessMarkerManagerTest {
 	}
 
 	@Test
-	public void testReadPostProcessFile()  throws IOException {
+	public void testReadPostProcessFile() throws IOException {
 		final TestHarness testHarness = new TestHarness();
 		try {
 			final String fileName = "testFile.dat";
@@ -112,8 +100,8 @@ public class PostProcessMarkerManagerTest {
 			assertThat(markerFile).exists();
 			assertThat(testHarness.manager.postProcessDelayPending(testFile)).isTrue();
 			// Parse test file
-			Map<String,String> result = testHarness.manager.readPostProcessFile(markerFile);
-			Map<String,String> expected = new HashMap<>();
+			Map<String, String> result = testHarness.manager.readPostProcessFile(markerFile);
+			Map<String, String> expected = new HashMap<>();
 			expected.put("action", "delete");
 			assertThat(result).isEqualTo(expected);
 			Files.write(Paths.get(markerFile.getAbsolutePath()),
@@ -130,7 +118,7 @@ public class PostProcessMarkerManagerTest {
 	}
 
 	@Test
-	public void tesRemovePostProcessFile()  throws IOException {
+	public void tesRemovePostProcessFile() throws IOException {
 		final TestHarness testHarness = new TestHarness();
 		try {
 			final String fileName = "testFile.dat";

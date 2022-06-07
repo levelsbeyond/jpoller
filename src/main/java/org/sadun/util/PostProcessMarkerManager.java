@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class PostProcessMarkerManager {
+
 	private final static Logger logger = LoggerFactory.getLogger(PostProcessMarkerManager.class);
 
 	int postProcessDelayMinutes;
@@ -48,7 +49,7 @@ public class PostProcessMarkerManager {
 		final long delayMillis = postProcessDelayMinutes * 60000L;
 		return delayMillis < 1 ||
 			(processedMarkerFile.exists() && processedMarkerFile.isFile() && processedMarkerFile.canRead() && processedMarkerFile.length() > 0
-			&& System.currentTimeMillis() - processedMarkerFile.lastModified() > delayMillis);
+				&& System.currentTimeMillis() - processedMarkerFile.lastModified() > delayMillis);
 	}
 
 	public Map<String, String> readPostProcessFile(final File processedMarkerFile) {
